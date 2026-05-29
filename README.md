@@ -42,7 +42,8 @@ No company domains, credentials, private project keys, screenshots, cookies, or 
 │   ├── jira_worklog_cli.py
 │   └── plan_worklogs.py
 └── tests/
-    └── test_plan_worklogs.py
+    ├── test_plan_worklogs.py
+    └── test_tempo_summary.py
 ```
 
 ## Quick Start
@@ -115,11 +116,19 @@ python "$env:USERPROFILE\.codex\skills\jira-worklog\scripts\jira_worklog_cli.py"
 Each `rows` entry includes:
 
 - `date`
+- `weekday`
 - `project_key` as the project number/key
 - `project_name`
 - `issue_key`
 - `issue_summary`
 - `hours`
+- `issue_compliance`
+
+When presenting results to a user, use this table format:
+
+```text
+日期 | 星期几 | 项目编号 | 项目 | issue | issue名字 | 工时 | issue是否合规
+```
 
 ## Submit a Confirmed Plan
 

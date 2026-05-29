@@ -8,6 +8,7 @@ JIRA_BASE_URL, JIRA_USERNAME, JIRA_PASSWORD, optional JIRA_TOKEN.
 from __future__ import annotations
 
 import base64
+import datetime as dt
 import http.cookiejar
 import json
 import os
@@ -16,6 +17,9 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Any
+
+
+WEEKDAY_LABELS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
 
 class JiraApiError(RuntimeError):
@@ -177,6 +181,28 @@ def derive_project_key(issue_key: str) -> str:
     return issue_key.rsplit("-", 1)[0]
 
 
+def parse_day(day: str) -> dt.date | None:
+    try:
+        return dt.date.fromisoformat(day)
+    except ValueError:
+        return None
+
+
+def weekday_label(day: str) -> str:
+    parsed = parse_day(day)
+    if parsed is None:
+        return ""
+    return WEEKDAY_LABELS[parsed.weekday()]
+
+
+def iso_week_key(day: str) -> tuple[int, int] | None:
+    parsed = parse_day(day)
+    if parsed is None:
+        return None
+    year, week, _ = parsed.isocalendar()
+    return year, week
+
+
 def project_from_tempo_issue(issue: dict[str, Any], issue_key: str) -> tuple[str, str]:
     project = issue.get("project") or {}
     project_key = (
@@ -220,10 +246,14 @@ def summarize_tempo_worklogs(
     summaries: dict[str, str] = {}
     project_keys: dict[str, str] = {}
     project_names: dict[str, str] = {}
+    issue_weeks: dict[str, set[tuple[int, int]]] = {}
     for worklog in worklogs:
         date_started = str(worklog.get("dateStarted", ""))[:10]
         issue = worklog.get("issue") or {}
         issue_key = issue.get("key") or "<unknown>"
+        week_key = iso_week_key(date_started)
+        if week_key is not None:
+            issue_weeks.setdefault(issue_key, set()).add(week_key)
         details = issue_details.get(issue_key, {})
         tempo_project_key, tempo_project_name = project_from_tempo_issue(issue, issue_key)
         summaries[issue_key] = details.get("issue_summary") or issue.get("summary") or summaries.get(issue_key, "")
@@ -235,14 +265,21 @@ def summarize_tempo_worklogs(
 
     rows = []
     for (day, issue_key), hours in sorted(totals.items()):
+        issue_compliance = "合规"
+        if issue_key == "<unknown>":
+            issue_compliance = "未知：缺少issue"
+        elif len(issue_weeks.get(issue_key, set())) > 1:
+            issue_compliance = "不合规：issue跨周"
         rows.append(
             {
                 "date": day,
+                "weekday": weekday_label(day),
                 "project_key": project_keys.get(issue_key, ""),
                 "project_name": project_names.get(issue_key, ""),
                 "issue_key": issue_key,
                 "issue_summary": summaries.get(issue_key, ""),
                 "hours": round(hours, 2),
+                "issue_compliance": issue_compliance,
             }
         )
     return rows
