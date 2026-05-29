@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from jira_tempo_client import JiraTempoClient, summarize_tempo_worklogs
+from jira_tempo_client import JiraTempoClient, fetch_issue_details, summarize_tempo_worklogs
 
 
 CONFIRM_PHRASE = "SUBMIT_JIRA_WORKLOGS"
@@ -45,7 +45,16 @@ def cmd_check_tempo(args: argparse.Namespace) -> int:
     except Exception:
         pass
     worklogs = client.tempo_worklogs(args.date_from, args.date_to, args.username)
-    rows = summarize_tempo_worklogs(worklogs)
+    issue_keys = [
+        (worklog.get("issue") or {}).get("key")
+        for worklog in worklogs
+        if (worklog.get("issue") or {}).get("key")
+    ]
+    try:
+        issue_details = fetch_issue_details(client, issue_keys)
+    except Exception:
+        issue_details = {}
+    rows = summarize_tempo_worklogs(worklogs, issue_details=issue_details)
     day_totals: dict[str, float] = {}
     for row in rows:
         day_totals[row["date"]] = round(day_totals.get(row["date"], 0.0) + float(row["hours"]), 2)

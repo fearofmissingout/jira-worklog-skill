@@ -171,14 +171,64 @@ class JiraTempoClient:
         return self.request("GET", f"/rest/api/2/issue/{urllib.parse.quote(issue_key)}/worklog")
 
 
-def summarize_tempo_worklogs(worklogs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def derive_project_key(issue_key: str) -> str:
+    if "-" not in issue_key:
+        return ""
+    return issue_key.rsplit("-", 1)[0]
+
+
+def project_from_tempo_issue(issue: dict[str, Any], issue_key: str) -> tuple[str, str]:
+    project = issue.get("project") or {}
+    project_key = (
+        project.get("key")
+        or issue.get("projectKey")
+        or issue.get("project_key")
+        or derive_project_key(issue_key)
+    )
+    project_name = project.get("name") or issue.get("projectName") or issue.get("project_name") or ""
+    return str(project_key or ""), str(project_name or "")
+
+
+def fetch_issue_details(client: Any, issue_keys: list[str]) -> dict[str, dict[str, str]]:
+    if not issue_keys:
+        return {}
+    quoted_keys = ", ".join(f'"{key}"' for key in sorted(set(issue_keys)))
+    result = client.search_issues(
+        f"key in ({quoted_keys})",
+        fields="summary,project",
+        max_results=len(set(issue_keys)),
+    )
+    details: dict[str, dict[str, str]] = {}
+    for issue in result.get("issues", []):
+        fields = issue.get("fields") or {}
+        project = fields.get("project") or {}
+        issue_key = issue.get("key") or ""
+        details[issue_key] = {
+            "issue_summary": fields.get("summary") or "",
+            "project_key": project.get("key") or derive_project_key(issue_key),
+            "project_name": project.get("name") or "",
+        }
+    return details
+
+
+def summarize_tempo_worklogs(
+    worklogs: list[dict[str, Any]],
+    issue_details: dict[str, dict[str, str]] | None = None,
+) -> list[dict[str, Any]]:
+    issue_details = issue_details or {}
     totals: dict[tuple[str, str], float] = {}
     summaries: dict[str, str] = {}
+    project_keys: dict[str, str] = {}
+    project_names: dict[str, str] = {}
     for worklog in worklogs:
         date_started = str(worklog.get("dateStarted", ""))[:10]
         issue = worklog.get("issue") or {}
         issue_key = issue.get("key") or "<unknown>"
-        summaries[issue_key] = issue.get("summary") or summaries.get(issue_key, "")
+        details = issue_details.get(issue_key, {})
+        tempo_project_key, tempo_project_name = project_from_tempo_issue(issue, issue_key)
+        summaries[issue_key] = details.get("issue_summary") or issue.get("summary") or summaries.get(issue_key, "")
+        project_keys[issue_key] = details.get("project_key") or tempo_project_key
+        project_names[issue_key] = details.get("project_name") or tempo_project_name
         totals[(date_started, issue_key)] = totals.get((date_started, issue_key), 0.0) + (
             float(worklog.get("timeSpentSeconds") or 0) / 3600.0
         )
@@ -188,6 +238,8 @@ def summarize_tempo_worklogs(worklogs: list[dict[str, Any]]) -> list[dict[str, A
         rows.append(
             {
                 "date": day,
+                "project_key": project_keys.get(issue_key, ""),
+                "project_name": project_names.get(issue_key, ""),
                 "issue_key": issue_key,
                 "issue_summary": summaries.get(issue_key, ""),
                 "hours": round(hours, 2),

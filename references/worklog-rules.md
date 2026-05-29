@@ -44,7 +44,8 @@ I am not sure whether these dates should receive worklogs: YYYY-MM-DD, YYYY-MM-D
 Before submission, show a draft and require explicit approval. The draft must include:
 
 - issue to reuse or create;
-- project key/name;
+- project key / project number;
+- project name;
 - issue summary;
 - date;
 - hours;
