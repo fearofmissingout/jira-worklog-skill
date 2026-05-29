@@ -21,7 +21,8 @@ Create safe drafts first, ask when holidays or required fields are unclear, subm
 3. Plan worklogs with `scripts/plan_worklogs.py`.
 4. Show the draft table to the user:
    - date
-   - project
+   - project key / project number
+   - project name
    - issue to reuse or issue to create
    - hours
    - comment
@@ -97,6 +98,8 @@ python .\scripts\jira_worklog_cli.py me
 python .\scripts\jira_worklog_cli.py check-tempo --from 2026-05-18 --to 2026-05-29 --username <jira-username>
 python .\scripts\jira_worklog_cli.py submit-plan --plan plan.json --confirm SUBMIT_JIRA_WORKLOGS
 ```
+
+`check-tempo` rows must be reported with `date`, `project_key`, `project_name`, `issue_key`, `issue_summary`, and `hours`.
 
 Only run `submit-plan` after showing the draft and receiving explicit approval from the user.
 

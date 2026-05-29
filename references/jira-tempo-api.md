@@ -93,8 +93,12 @@ Common fields:
 - `author`
 - `issue.key`
 - `issue.summary`
+- `issue.project.key` or project key derived from the issue key
+- `issue.project.name`, when available or fetched from Jira search
 - `worklogAttributes`
 - `workAttributeValues`
+
+The CLI enriches Tempo rows with Jira search when possible so output rows include both `project_key` and `project_name`.
 
 Other useful endpoints may exist depending on Tempo version and permissions:
 

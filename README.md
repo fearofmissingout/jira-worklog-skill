@@ -112,6 +112,15 @@ python "$env:USERPROFILE\.codex\skills\jira-worklog\scripts\jira_worklog_cli.py"
   --username your.username
 ```
 
+Each `rows` entry includes:
+
+- `date`
+- `project_key` as the project number/key
+- `project_name`
+- `issue_key`
+- `issue_summary`
+- `hours`
+
 ## Submit a Confirmed Plan
 
 Only run this after the user has reviewed the draft and explicitly approved submission:
