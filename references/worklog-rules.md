@@ -44,14 +44,22 @@ I am not sure whether these dates should receive worklogs: YYYY-MM-DD, YYYY-MM-D
 Before submission, show a draft and require explicit approval. The draft must include:
 
 - issue to reuse or create;
+- date and weekday;
 - project key / project number;
 - project name;
+- issue key;
 - issue summary;
-- date;
 - hours;
+- issue compliance;
 - comment;
 - questions;
 - blocking errors.
+
+When showing checked Tempo rows to the user, use this column order:
+
+```text
+日期 | 星期几 | 项目编号 | 项目 | issue | issue名字 | 工时 | issue是否合规
+```
 
 After submission, query Tempo/Jira again and verify:
 

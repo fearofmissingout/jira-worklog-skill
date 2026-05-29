@@ -100,6 +100,17 @@ Common fields:
 
 The CLI enriches Tempo rows with Jira search when possible so output rows include both `project_key` and `project_name`.
 
+`check-tempo` row output fields:
+
+- `date`
+- `weekday`
+- `project_key`
+- `project_name`
+- `issue_key`
+- `issue_summary`
+- `hours`
+- `issue_compliance`
+
 Other useful endpoints may exist depending on Tempo version and permissions:
 
 ```text
