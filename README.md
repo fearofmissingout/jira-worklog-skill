@@ -38,6 +38,7 @@ No company domains, credentials, private project keys, screenshots, cookies, or 
 ├── references/
 │   ├── automation-workflow.md
 │   ├── jira-tempo-api.md
+│   ├── local-configuration.md
 │   └── worklog-rules.md
 ├── scripts/
 │   ├── jira_tempo_client.py
@@ -81,23 +82,50 @@ python "$env:USERPROFILE\.codex\skills\jira-worklog\tests\test_plan_worklogs.py"
 After installing the skill, ask Codex to initialize the automation explicitly:
 
 ```text
-用 jira-worklog 初始化每日工时自动化：10点询问计划，17点生成草稿，18点如果没有风险就自动提交，周末和月末做review。
+用 jira-worklog 初始化每日工时自动化：10点询问计划，17点生成草稿，18点如果没有风险就自动提交，20点执行最终兜底，周末和月末做review。
 ```
 
-The skill should confirm whether 18:00 auto-submit is enabled, whether last-resort weekly/monthly backfill is enabled, whether the default 10:00 / 17:00 / 18:00 schedule is acceptable, and whether any holidays, leave days, or makeup workdays are known.
+The skill should confirm whether 18:00 auto-submit is enabled, whether last-resort weekly/monthly backfill is enabled, whether the default 10:00 / 17:00 / 18:00 / 20:00 schedule is acceptable, and whether any holidays, leave days, or makeup workdays are known.
 
 Daily flow:
 
 - 10:00: ask what the user will work on today.
 - 17:00: generate a draft table for review.
 - 18:00: submit only if auto-submit is enabled and every safety check passes; otherwise ask for confirmation or missing details.
+- 20:00: if weekly/monthly fallback is enabled and the 18:00 pending list is still unanswered, fill eligible gaps and read back.
 - Last workday of the week: review the current week.
 - Last calendar day of the month: review the current month.
-- Optional last-resort backfill: if enabled and the final weekly/monthly checkpoint has no user confirmation or usable work details, fill only missing confirmed workdays by mirroring the latest compliant prior project/issue pattern.
+- Optional last-resort backfill: if enabled and the final weekly/monthly checkpoint has no user confirmation or usable work details, fill confirmed workday gaps by mirroring the last recorded compliant issue from the most recent confirmed workday.
 
 The automation does not blindly fill weekends, holidays, leave days, or uncertain dates. If the calendar is unclear, it asks which dates are non-working days and which weekend dates are makeup workdays.
 
-Last-resort backfill still does not overwrite existing rows, fill uncertain dates, or reuse an issue across ISO week boundaries.
+Last-resort backfill can top up partially filled days to 8h, but it must notify the user for each partial-day fill. It still does not overwrite existing rows, fill uncertain dates, skip project issue-rule validation, or reuse an issue across ISO week boundaries.
+
+## Local Private Config
+
+The agent should create and maintain private local config from search, Jira metadata, historical records, and user confirmation. The user should confirm or correct in natural language instead of editing JSON manually.
+
+Ignored local files live under:
+
+```text
+.local/calendar.local.json
+.local/project-rules.local.json
+.local/automation-state.local.json
+```
+
+Examples:
+
+```text
+初始化 2026 工作日历
+```
+
+```text
+6月12号年假，9月30号公司提前放假，10月10号正常补班
+```
+
+```text
+更新项目创建规则，之后这个项目的子分类用某某分类
+```
 
 ## Usage Examples
 

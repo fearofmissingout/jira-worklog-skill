@@ -34,6 +34,7 @@ Create safe drafts first, ask when holidays or required fields are unclear, subm
 6. After the user explicitly approves, submit with `scripts/jira_worklog_cli.py submit-plan --confirm SUBMIT_JIRA_WORKLOGS`.
 7. Immediately run a read-back check and compare the submitted result against the draft.
 8. For scheduled reminders, daily auto-submit, weekly review, or monthly review, read [references/automation-workflow.md](references/automation-workflow.md) before creating or updating automations.
+9. For calendar setup, project issue-field rules, or local automation state, read [references/local-configuration.md](references/local-configuration.md). Generate local config from search/Jira/history plus user confirmation; do not ask users to hand-edit JSON.
 
 ## Worklog Rules
 
@@ -57,15 +58,16 @@ Use one controller automation for the current thread when possible:
 - 10:00 local time: ask what the user will work on today.
 - 17:00 local time: turn the user's description into a draft and show the standard table.
 - 18:00 local time: if the user opted into auto-submit and the draft is clean, submit and immediately read back; otherwise ask for confirmation or missing details.
+- 20:00 local time: if the final weekly/monthly backfill draft is still unanswered and last-resort backfill is enabled, fill eligible gaps and read back.
 - Last workday of the week: review the current week's Tempo rows and highlight missing, duplicate, overfilled, or cross-week issue records.
 - Last calendar day of the month: review the current month's Tempo rows with the same checks plus month-level totals.
-- If the user explicitly enabled last-resort backfill, the last weekly/monthly review may fill missing confirmed workdays by copying the latest compliant project/issue pattern.
+- If the user explicitly enabled last-resort backfill, the last weekly/monthly review prepares a pending backfill at 18:00 and may execute it at 20:00.
 
 At automation setup time, confirm:
 
 - whether 18:00 auto-submit is enabled;
 - whether last-resort weekly/monthly backfill is enabled;
-- whether the default 10:00 / 17:00 / 18:00 schedule is acceptable;
+- whether the default 10:00 / 17:00 / 18:00 / 20:00 schedule is acceptable;
 - which holidays, leave days, or makeup workdays are known if the upcoming period is ambiguous.
 
 Auto-submit at 18:00 is allowed only when all are true:
@@ -80,10 +82,12 @@ Auto-submit at 18:00 is allowed only when all are true:
 Last-resort backfill is allowed only when all are true:
 
 - the user explicitly opted into weekly/monthly backfill;
-- the weekly or monthly review reached its final scheduled checkpoint without user confirmation or usable work details;
-- only missing confirmed workdays are filled;
+- the 18:00 weekly/monthly review showed a pending backfill list;
+- the 20:00 final checkpoint arrived without user confirmation, rejection, or usable work details;
+- missing and partially filled confirmed workdays are filled only up to the expected daily 8h total;
 - holidays, leave days, weekends, and uncertain makeup days are excluded;
-- the reference source is the latest compliant prior issue/worklog pattern for the same user;
+- the reference source is the last recorded compliant issue from the most recent confirmed workday, moving backward if needed;
+- project rules from local config and Jira metadata confirm required create-issue fields, assignee, issue type, and category/custom fields;
 - each created or reused issue still stays inside one ISO week;
 - no existing Tempo row for the target date would become duplicated or overfilled.
 

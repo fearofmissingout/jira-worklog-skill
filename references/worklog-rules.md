@@ -44,7 +44,8 @@ For scheduled automation:
 - the 10:00 intake can run on likely workdays, but should accept "leave" or "not working" answers;
 - the 17:00 draft must stop if the target date is not a confirmed workday;
 - the 18:00 auto-submit gate must stop when holiday, leave, weekend, or makeup status is unclear.
-- weekly/monthly last-resort backfill must exclude holidays, leave days, weekends, and uncertain makeup days even when the user enabled fallback filling.
+- the 18:00 weekly/monthly review may show a pending fallback list, but must not execute fallback filling.
+- the 20:00 final fallback gate must exclude holidays, leave days, weekends, and uncertain makeup days even when the user enabled fallback filling.
 
 ## Submission Gate
 
@@ -97,4 +98,4 @@ Monthly review should check the whole month and report:
 
 Reviews should not automatically edit historical worklogs. Show findings and ask for approval before changing anything.
 
-Exception: when the user explicitly enabled last-resort weekly/monthly backfill, the final scheduled review may fill missing confirmed workdays by copying the latest compliant prior project/issue pattern. This exception still cannot overwrite existing rows, fill uncertain dates, exceed expected daily hours, or let one issue cross an ISO week boundary.
+Exception: when the user explicitly enabled last-resort weekly/monthly backfill, the 20:00 final scheduled checkpoint may fill missing or partially filled confirmed workdays by copying the last recorded compliant issue from the most recent confirmed workday. This exception still cannot overwrite existing rows, fill uncertain dates, exceed expected daily hours, skip project-rule validation, or let one issue cross an ISO week boundary.

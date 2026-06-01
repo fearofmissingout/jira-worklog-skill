@@ -16,3 +16,4 @@ cookies*.txt
 session*.json
 plan.local.json
 draft.local.json
+.local/

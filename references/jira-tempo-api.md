@@ -31,6 +31,15 @@ Use search to resolve fuzzy natural-language project/task descriptions to existi
 
 ## Create Issue
 
+Before creating issues, discover and validate project metadata:
+
+```text
+GET /rest/api/2/issue/createmeta?projectKeys=PROJECTKEY&expand=projects.issuetypes.fields
+GET /rest/api/2/issue/{issueKey}/editmeta
+```
+
+Use metadata plus local project rules to confirm issue type, assignee/self support, category/subcategory fields, components, and required custom fields. If metadata conflicts with `.local/project-rules.local.json`, stop and ask the user to confirm the correct rule.
+
 ```text
 POST /rest/api/2/issue
 ```
@@ -47,7 +56,7 @@ Typical fields:
 }
 ```
 
-Some Jira projects require additional custom fields such as category, request type, component, or customer field. Put non-secret defaults in the plan payload or use `JIRA_DEFAULT_CATEGORIES_JSON`.
+Some Jira projects require additional custom fields such as category, request type, component, or customer field. Store project-specific defaults in private local config or environment variables, not public docs.
 
 ## Jira Worklogs
 
