@@ -43,10 +43,12 @@ No company domains, credentials, private project keys, screenshots, cookies, or 
 ├── scripts/
 │   ├── jira_tempo_client.py
 │   ├── jira_worklog_cli.py
-│   └── plan_worklogs.py
+│   ├── plan_worklogs.py
+│   └── update_skill.py
 └── tests/
     ├── test_plan_worklogs.py
-    └── test_tempo_summary.py
+    ├── test_tempo_summary.py
+    └── test_update_skill.py
 ```
 
 ## Quick Start
@@ -76,6 +78,18 @@ Run tests:
 ```powershell
 python "$env:USERPROFILE\.codex\skills\jira-worklog\tests\test_plan_worklogs.py"
 ```
+
+## Check for Updates
+
+Install the skill as a Git clone so future updates are simple:
+
+```powershell
+cd "$env:USERPROFILE\.codex\skills\jira-worklog"
+python .\scripts\update_skill.py check
+python .\scripts\update_skill.py update
+```
+
+The updater runs `git fetch` and `git pull --ff-only` for Git-installed skills. It refuses to update non-Git copies or directories with local Git changes. Private `.local/` files are ignored by Git and are not overwritten.
 
 ## Optional Daily Automation
 

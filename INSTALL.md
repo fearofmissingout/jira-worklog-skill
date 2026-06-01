@@ -40,6 +40,26 @@ git pull
 
 Restart Codex or open a new session so the skill metadata is loaded.
 
+## Update the Skill
+
+If the installation directory is a Git clone, update in place:
+
+```powershell
+cd "$env:USERPROFILE\.codex\skills\jira-worklog"
+python .\scripts\update_skill.py check
+python .\scripts\update_skill.py update
+```
+
+You can also use plain Git:
+
+```powershell
+git pull --ff-only
+```
+
+The updater refuses to modify non-Git copies. If your installed directory is not a Git checkout, migrate once by backing it up, cloning the repository into the same path, and copying any `.local/` private config back.
+
+Restart Codex after updating so skill metadata is reloaded.
+
 ## Optional Automation Setup
 
 Installation does not create recurring jobs automatically. After the skill is installed, ask Codex to initialize automation:

@@ -1,6 +1,6 @@
 ---
 name: jira-worklog
-description: Use when filling, checking, drafting, creating, validating, or automating Jira and Tempo worklogs from natural-language descriptions, especially daily, weekly, or monthly project work summaries.
+description: Use when filling, checking, drafting, creating, validating, automating, checking updates for, or updating Jira and Tempo worklogs from natural-language descriptions, especially daily, weekly, or monthly project work summaries.
 ---
 
 # Jira Worklog
@@ -35,6 +35,7 @@ Create safe drafts first, ask when holidays or required fields are unclear, subm
 7. Immediately run a read-back check and compare the submitted result against the draft.
 8. For scheduled reminders, daily auto-submit, weekly review, or monthly review, read [references/automation-workflow.md](references/automation-workflow.md) before creating or updating automations.
 9. For calendar setup, project issue-field rules, or local automation state, read [references/local-configuration.md](references/local-configuration.md). Generate local config from search/Jira/history plus user confirmation; do not ask users to hand-edit JSON.
+10. For "check skill updates", "update this skill", or similar requests, use `scripts/update_skill.py`.
 
 ## Worklog Rules
 
@@ -112,6 +113,19 @@ Optional default issue categories can be supplied as JSON:
 ```text
 JIRA_DEFAULT_CATEGORIES_JSON={"PROJECTKEY":"Category Name"}
 ```
+
+## Skill Updates
+
+Prefer installing this skill as a Git checkout. When the user asks to check or apply skill updates, run:
+
+```powershell
+python .\scripts\update_skill.py check
+python .\scripts\update_skill.py update
+```
+
+Use `--dir <skill-install-dir>` when running from outside the installed skill directory. The updater only changes Git-tracked skill files. Keep private state under `.local/`, which is ignored by Git.
+
+If the installed skill directory is not a Git checkout, do not overwrite it silently. Tell the user to migrate the installation to a Git clone first, preserving `.local/`.
 
 ## Planning Script
 
