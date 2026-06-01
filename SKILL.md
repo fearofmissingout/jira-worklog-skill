@@ -1,13 +1,13 @@
 ---
 name: jira-worklog
-description: Use when filling, checking, drafting, creating, or validating Jira and Tempo worklogs from natural-language descriptions, especially weekly or daily project work summaries.
+description: Use when filling, checking, drafting, creating, validating, or automating Jira and Tempo worklogs from natural-language descriptions, especially daily, weekly, or monthly project work summaries.
 ---
 
 # Jira Worklog
 
 ## Core Rule
 
-Create safe drafts first, ask when holidays or required fields are unclear, submit only after explicit user confirmation, then query Jira/Tempo again to verify.
+Create safe drafts first, ask when holidays or required fields are unclear, submit only after explicit user confirmation or a previously configured safe auto-submit gate, then query Jira/Tempo again to verify.
 
 ## Required Flow
 
@@ -33,6 +33,7 @@ Create safe drafts first, ask when holidays or required fields are unclear, subm
 5. Do not submit while any question or blocking error remains.
 6. After the user explicitly approves, submit with `scripts/jira_worklog_cli.py submit-plan --confirm SUBMIT_JIRA_WORKLOGS`.
 7. Immediately run a read-back check and compare the submitted result against the draft.
+8. For scheduled reminders, daily auto-submit, weekly review, or monthly review, read [references/automation-workflow.md](references/automation-workflow.md) before creating or updating automations.
 
 ## Worklog Rules
 
@@ -46,6 +47,35 @@ Read [references/worklog-rules.md](references/worklog-rules.md) before planning 
 - Do not write worklogs for holidays, weekends, leave days, or uncertain dates without user confirmation.
 - If the calendar is ambiguous, ask which dates are non-working days and which weekend dates are makeup workdays.
 - Check existing worklogs before submitting to avoid duplicates and overfilled days.
+
+## Automation Workflow
+
+Do not create automations during clone/install. Initialize them only when the user explicitly asks, such as "initialize daily Jira worklog automation" or "初始化每日工时自动化".
+
+Use one controller automation for the current thread when possible:
+
+- 10:00 local time: ask what the user will work on today.
+- 17:00 local time: turn the user's description into a draft and show the standard table.
+- 18:00 local time: if the user opted into auto-submit and the draft is clean, submit and immediately read back; otherwise ask for confirmation or missing details.
+- Last workday of the week: review the current week's Tempo rows and highlight missing, duplicate, overfilled, or cross-week issue records.
+- Last calendar day of the month: review the current month's Tempo rows with the same checks plus month-level totals.
+
+At automation setup time, confirm:
+
+- whether 18:00 auto-submit is enabled;
+- whether the default 10:00 / 17:00 / 18:00 schedule is acceptable;
+- which holidays, leave days, or makeup workdays are known if the upcoming period is ambiguous.
+
+Auto-submit at 18:00 is allowed only when all are true:
+
+- the user previously opted into this behavior;
+- there is a single latest draft for the target day;
+- no questions or blocking errors remain;
+- existing Tempo rows do not show duplicate or overfilled worklogs;
+- project, issue, issue summary, hours, and comments match the user's latest description;
+- the date is a confirmed workday.
+
+Use generic examples in public docs and prompts, such as "某某项目", "某某功能开发", and "EXAMPLE". Do not include private company names, client names, domains, project names, project keys, categories, credentials, screenshots, cookies, HAR files, or local drafts.
 
 ## Credentials
 
@@ -111,6 +141,8 @@ python .\scripts\jira_worklog_cli.py submit-plan --plan plan.json --confirm SUBM
 The JSON fields are `date`, `weekday`, `project_key`, `project_name`, `issue_key`, `issue_summary`, `hours`, and `issue_compliance`.
 
 Only run `submit-plan` after showing the draft and receiving explicit approval from the user.
+
+For a pre-authorized 18:00 auto-submit workflow, pass the confirmation phrase only after the automation has verified every auto-submit gate listed above.
 
 ## Common Mistakes
 

@@ -39,6 +39,12 @@ Useful question wording:
 I am not sure whether these dates should receive worklogs: YYYY-MM-DD, YYYY-MM-DD. Which dates were non-working days, and which weekend dates were makeup workdays?
 ```
 
+For scheduled automation:
+
+- the 10:00 intake can run on likely workdays, but should accept "leave" or "not working" answers;
+- the 17:00 draft must stop if the target date is not a confirmed workday;
+- the 18:00 auto-submit gate must stop when holiday, leave, weekend, or makeup status is unclear.
+
 ## Submission Gate
 
 Before submission, show a draft and require explicit approval. The draft must include:
@@ -67,3 +73,25 @@ After submission, query Tempo/Jira again and verify:
 - no date exceeds the daily limit unexpectedly;
 - each issue stays inside one week;
 - project and issue match the user's natural-language intent.
+
+## Review Checks
+
+Weekly review should check the current ISO week and report:
+
+- missing expected workdays;
+- dates below or above expected hours;
+- duplicate-looking rows;
+- issue records that cross week boundaries;
+- rows missing project number, project name, issue key, or issue summary.
+
+Monthly review should check the whole month and report:
+
+- expected workdays versus filled workdays;
+- total expected hours versus actual hours;
+- missing dates;
+- weekend or holiday rows that need confirmation;
+- overfilled dates;
+- issue compliance problems;
+- project-level hour totals.
+
+Reviews should not automatically edit historical worklogs. Show findings and ask for approval before changing anything.

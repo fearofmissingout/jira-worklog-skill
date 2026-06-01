@@ -8,7 +8,7 @@ The skill is built around a safe workflow:
 2. Split work into weekly-safe Jira issues.
 3. Generate a draft before writing anything.
 4. Ask the user to resolve holidays, leave, makeup workdays, required fields, and duplicates.
-5. Submit only after explicit approval.
+5. Submit only after explicit approval, or after a pre-configured 18:00 auto-submit gate passes every safety check.
 6. Read Jira/Tempo back after submission and verify the result.
 
 No company domains, credentials, private project keys, screenshots, cookies, or HAR/WADL discovery artifacts should be committed to this repository.
@@ -22,7 +22,8 @@ No company domains, credentials, private project keys, screenshots, cookies, or 
 - Default full working day is 8 hours.
 - Holidays, leave days, weekends, and makeup workdays must be explicit when ambiguous.
 - Existing worklogs must be checked before submission.
-- Submission requires the exact confirmation phrase `SUBMIT_JIRA_WORKLOGS`.
+- Manual submission requires the exact confirmation phrase `SUBMIT_JIRA_WORKLOGS`.
+- Scheduled auto-submit is allowed only when the user opted in during automation setup and the current draft has no questions, blocking errors, duplicate risk, overfilled-day risk, or calendar ambiguity.
 - Completion requires read-back verification from Jira/Tempo.
 
 ## Repository Layout
@@ -35,6 +36,7 @@ No company domains, credentials, private project keys, screenshots, cookies, or 
 ├── agents/
 │   └── openai.yaml
 ├── references/
+│   ├── automation-workflow.md
 │   ├── jira-tempo-api.md
 │   └── worklog-rules.md
 ├── scripts/
@@ -72,6 +74,58 @@ Run tests:
 
 ```powershell
 python "$env:USERPROFILE\.codex\skills\jira-worklog\tests\test_plan_worklogs.py"
+```
+
+## Optional Daily Automation
+
+After installing the skill, ask Codex to initialize the automation explicitly:
+
+```text
+用 jira-worklog 初始化每日工时自动化：10点询问计划，17点生成草稿，18点如果没有风险就自动提交，周末和月末做review。
+```
+
+The skill should confirm whether 18:00 auto-submit is enabled, whether the default 10:00 / 17:00 / 18:00 schedule is acceptable, and whether any holidays, leave days, or makeup workdays are known.
+
+Daily flow:
+
+- 10:00: ask what the user will work on today.
+- 17:00: generate a draft table for review.
+- 18:00: submit only if auto-submit is enabled and every safety check passes; otherwise ask for confirmation or missing details.
+- Last workday of the week: review the current week.
+- Last calendar day of the month: review the current month.
+
+The automation does not blindly fill weekends, holidays, leave days, or uncertain dates. If the calendar is unclear, it asks which dates are non-working days and which weekend dates are makeup workdays.
+
+## Usage Examples
+
+Single project day:
+
+```text
+某某项目，做某某功能开发，8小时
+```
+
+Multiple tasks in one day:
+
+```text
+上午某某项目接口联调4小时，下午另一个项目问题排查4小时
+```
+
+Leave day:
+
+```text
+今天年假，不填工时
+```
+
+Makeup workday:
+
+```text
+今天虽然周六但补班，某某项目某某功能开发8小时
+```
+
+Weekly broad task:
+
+```text
+这周某某项目，做某某功能相关开发，每天8小时
 ```
 
 ## Draft a Plan
