@@ -84,7 +84,7 @@ After installing the skill, ask Codex to initialize the automation explicitly:
 用 jira-worklog 初始化每日工时自动化：10点询问计划，17点生成草稿，18点如果没有风险就自动提交，周末和月末做review。
 ```
 
-The skill should confirm whether 18:00 auto-submit is enabled, whether the default 10:00 / 17:00 / 18:00 schedule is acceptable, and whether any holidays, leave days, or makeup workdays are known.
+The skill should confirm whether 18:00 auto-submit is enabled, whether last-resort weekly/monthly backfill is enabled, whether the default 10:00 / 17:00 / 18:00 schedule is acceptable, and whether any holidays, leave days, or makeup workdays are known.
 
 Daily flow:
 
@@ -93,8 +93,11 @@ Daily flow:
 - 18:00: submit only if auto-submit is enabled and every safety check passes; otherwise ask for confirmation or missing details.
 - Last workday of the week: review the current week.
 - Last calendar day of the month: review the current month.
+- Optional last-resort backfill: if enabled and the final weekly/monthly checkpoint has no user confirmation or usable work details, fill only missing confirmed workdays by mirroring the latest compliant prior project/issue pattern.
 
 The automation does not blindly fill weekends, holidays, leave days, or uncertain dates. If the calendar is unclear, it asks which dates are non-working days and which weekend dates are makeup workdays.
+
+Last-resort backfill still does not overwrite existing rows, fill uncertain dates, or reuse an issue across ISO week boundaries.
 
 ## Usage Examples
 

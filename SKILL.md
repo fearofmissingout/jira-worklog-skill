@@ -59,10 +59,12 @@ Use one controller automation for the current thread when possible:
 - 18:00 local time: if the user opted into auto-submit and the draft is clean, submit and immediately read back; otherwise ask for confirmation or missing details.
 - Last workday of the week: review the current week's Tempo rows and highlight missing, duplicate, overfilled, or cross-week issue records.
 - Last calendar day of the month: review the current month's Tempo rows with the same checks plus month-level totals.
+- If the user explicitly enabled last-resort backfill, the last weekly/monthly review may fill missing confirmed workdays by copying the latest compliant project/issue pattern.
 
 At automation setup time, confirm:
 
 - whether 18:00 auto-submit is enabled;
+- whether last-resort weekly/monthly backfill is enabled;
 - whether the default 10:00 / 17:00 / 18:00 schedule is acceptable;
 - which holidays, leave days, or makeup workdays are known if the upcoming period is ambiguous.
 
@@ -74,6 +76,16 @@ Auto-submit at 18:00 is allowed only when all are true:
 - existing Tempo rows do not show duplicate or overfilled worklogs;
 - project, issue, issue summary, hours, and comments match the user's latest description;
 - the date is a confirmed workday.
+
+Last-resort backfill is allowed only when all are true:
+
+- the user explicitly opted into weekly/monthly backfill;
+- the weekly or monthly review reached its final scheduled checkpoint without user confirmation or usable work details;
+- only missing confirmed workdays are filled;
+- holidays, leave days, weekends, and uncertain makeup days are excluded;
+- the reference source is the latest compliant prior issue/worklog pattern for the same user;
+- each created or reused issue still stays inside one ISO week;
+- no existing Tempo row for the target date would become duplicated or overfilled.
 
 Use generic examples in public docs and prompts, such as "某某项目", "某某功能开发", and "EXAMPLE". Do not include private company names, client names, domains, project names, project keys, categories, credentials, screenshots, cookies, HAR files, or local drafts.
 

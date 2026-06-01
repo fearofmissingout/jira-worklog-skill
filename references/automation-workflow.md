@@ -15,6 +15,7 @@ Recommended user prompt:
 Before creating or updating an automation, confirm:
 
 - whether 18:00 auto-submit is enabled;
+- whether last-resort weekly/monthly backfill is enabled;
 - whether 10:00, 17:00, and 18:00 local time are acceptable;
 - whether the workflow should run only on confirmed workdays;
 - whether any upcoming holidays, leave days, or makeup workdays are already known.
@@ -117,6 +118,8 @@ Report:
 
 Use the standard table first, then a concise summary of issues to fix.
 
+If last-resort backfill is enabled and the user gives no confirmation or usable work details by the final weekly checkpoint, fill only missing confirmed workdays by mirroring the latest compliant prior issue/worklog pattern. Prefer the previous week's same project/task pattern when available. If no compliant prior pattern exists, stop and ask.
+
 ## Monthly Review
 
 On the last calendar day of the month, after the daily flow, check the whole month's Tempo rows.
@@ -132,6 +135,43 @@ Report:
 - project-level hour totals.
 
 Do not automatically edit historical worklogs during review. Show findings and ask for confirmation before creating, changing, or deleting anything.
+
+If last-resort backfill is enabled and the user gives no confirmation or usable work details by the final monthly checkpoint, fill only missing confirmed workdays by mirroring the latest compliant prior issue/worklog pattern from the nearest prior filled period. Do not overwrite or adjust existing rows.
+
+## Last-Resort Backfill
+
+This is the fallback after daily reminders, daily auto-submit, weekly review, and monthly review all failed to get usable user input. It must be explicitly enabled during automation setup.
+
+Trigger it only when:
+
+- the scheduled weekly or monthly final checkpoint has arrived;
+- the user has not confirmed, rejected, or provided task details;
+- Tempo shows one or more missing expected workdays in the target week or month;
+- the missing dates are confirmed workdays.
+
+How to fill:
+
+- Query the nearest prior filled period for this user.
+- Pick the latest compliant issue/worklog pattern with project number, project name, issue, issue summary, hours, and comment.
+- Copy that pattern only as a draft plan for missing confirmed workdays.
+- Keep issue boundaries inside the target ISO week; create a new weekly/day issue when reusing the old issue would cross a week.
+- Use the default full-day 8h only for dates with zero existing hours.
+- Submit only when duplicate, overfilled-day, required-field, and issue-compliance checks are clean.
+- Immediately read Tempo back and report the standard table.
+
+Stop and ask instead of filling when:
+
+- any missing date might be a holiday, leave day, weekend, or uncertain makeup day;
+- existing worklogs already partially fill the date and the remaining hours are unclear;
+- the latest prior pattern has a non-compliant issue, missing project number, missing issue summary, or ambiguous project;
+- copying the prior pattern would cross an ISO week boundary;
+- more than one plausible prior project/task pattern exists and there is no clear latest pattern.
+
+Example fallback notice:
+
+```text
+本周没有收到可用工时信息。我会按已开启的兜底规则，仅为确认工作日中缺失的日期，参考最近一次合规的某某项目/某某功能记录补齐；节假日、请假日、周末和不确定调休日不会填。
+```
 
 ## Public Documentation Hygiene
 

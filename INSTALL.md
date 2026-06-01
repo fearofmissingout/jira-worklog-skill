@@ -51,6 +51,7 @@ Installation does not create recurring jobs automatically. After the skill is in
 Codex should confirm:
 
 - whether 18:00 auto-submit is enabled;
+- whether last-resort weekly/monthly backfill is enabled;
 - whether the default 10:00 / 17:00 / 18:00 local-time schedule is acceptable;
 - whether the workflow should run only on confirmed workdays;
 - whether any upcoming holidays, leave days, or makeup workdays are known.
@@ -62,6 +63,7 @@ Daily operation after setup:
 - 18:00: submit only if auto-submit is enabled and the draft is clean; otherwise ask for confirmation.
 - Last workday of the week: review missing, duplicate, overfilled, and cross-week issue records.
 - Last calendar day of the month: review monthly totals, missing days, calendar exceptions, and issue compliance.
+- Optional final fallback: if enabled and the last weekly/monthly checkpoint receives no confirmation or usable work details, fill only missing confirmed workdays by copying the latest compliant prior project/issue pattern.
 
 ## Configure Credentials
 
