@@ -149,6 +149,22 @@ class PlanWorklogsTest(unittest.TestCase):
         self.assertEqual(result["issue_drafts"][0]["category"], "Development")
         self.assertEqual(result["questions"], [])
 
+    def test_accepts_resolved_extra_fields_without_category_string(self):
+        result = run_plan(
+            {
+                "date_from": "2026-06-01",
+                "date_to": "2026-06-01",
+                "project": {"key": "EXAMPLE", "name": "Example Project"},
+                "default_hours": 8,
+                "description": "QA validation",
+                "extra_fields": {"customfield_10000": {"id": "2"}},
+            }
+        )
+
+        draft = result["issue_drafts"][0]
+        self.assertEqual(draft["extra_fields"], {"customfield_10000": {"id": "2"}})
+        self.assertEqual(result["questions"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

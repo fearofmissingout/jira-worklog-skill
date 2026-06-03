@@ -103,6 +103,7 @@ def default_weekly_activities(payload: dict[str, Any]) -> list[dict[str, Any]]:
 def group_issue_drafts(payload: dict[str, Any], activities: list[dict[str, Any]]) -> list[dict[str, Any]]:
     project = payload["project"]
     category = payload.get("category") or load_default_categories().get(project["key"])
+    category_id = payload.get("category_id")
     existing_issues = payload.get("existing_issues", [])
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
 
@@ -138,7 +139,12 @@ def group_issue_drafts(payload: dict[str, Any], activities: list[dict[str, Any]]
                 "needs_issue_creation": issue_key is None,
                 "issue_summary": summary,
                 "issue_type": payload.get("issue_type", "Task"),
+                "assignee": payload.get("assignee"),
                 "category": category,
+                "category_id": category_id,
+                "category_field": payload.get("category_field", "customfield_13900"),
+                "priority_id": payload.get("priority_id"),
+                "extra_fields": payload.get("extra_fields"),
                 "worklogs": sorted(worklogs, key=lambda item: item["date"]),
             }
         )
@@ -153,7 +159,9 @@ def validate_plan(issue_drafts: list[dict[str, Any]]) -> tuple[list[str], list[s
     for issue in issue_drafts:
         week_start = parse_date(issue["week_start"])
         week_end = parse_date(issue["week_end"])
-        if issue["needs_issue_creation"] and issue.get("category") is None:
+        if issue["needs_issue_creation"] and not (
+            issue.get("category") or issue.get("category_id") or issue.get("extra_fields")
+        ):
             questions.append(
                 f"{issue['project_key']} needs category/custom required fields before creating {issue['issue_summary']}."
             )

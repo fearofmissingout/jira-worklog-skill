@@ -12,6 +12,7 @@ import datetime as dt
 import http.cookiejar
 import json
 import os
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -20,6 +21,28 @@ from typing import Any
 
 
 WEEKDAY_LABELS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+COMPLIANT_LABEL = "合规"
+UNKNOWN_ISSUE_LABEL = "未知：缺少issue"
+CROSS_WEEK_LABEL = "不合规：issue跨周"
+
+TERM_SYNONYM_HINTS = {
+    "开发": ["api", "code", "coding", "dev", "接口", "联调", "重构"],
+    "测试": ["qa", "test", "testing", "validation", "验证"],
+    "验证": ["qa", "test", "testing", "validation", "测试"],
+    "文档": ["doc", "docs", "document", "说明", "手册", "编写"],
+    "方案": ["design", "proposal", "设计", "规划"],
+    "会议": ["meeting", "sync", "周会", "讨论", "沟通"],
+    "沟通": ["meeting", "sync", "会议", "讨论", "对齐"],
+    "分析": ["analysis", "review", "调研", "评估", "排查"],
+    "实施": ["deploy", "implementation", "上线", "部署", "迁移"],
+    "迁移": ["migration", "实施", "搬迁"],
+    "工单": ["ticket", "配置", "日常"],
+    "配置": ["config", "configuration", "工单", "权限"],
+    "变更": ["change", "故障", "问题", "修复"],
+    "问题": ["issue", "incident", "故障", "修复"],
+    "进度": ["schedule", "timeline", "协调", "计划", "排期"],
+    "管理": ["management", "协调", "计划", "排期"],
+}
 
 
 class JiraApiError(RuntimeError):
@@ -29,6 +52,126 @@ class JiraApiError(RuntimeError):
         self.status = status
         self.body = body
         super().__init__(f"{method} {url} failed with {status}: {body[:400]}")
+
+
+def normalize_match_text(value: Any) -> str:
+    return re.sub(r"\s+", "", str(value or "").casefold())
+
+
+def allowed_value_text(option: dict[str, Any]) -> str:
+    return str(option.get("value") or option.get("name") or "")
+
+
+def option_payload(option: dict[str, Any]) -> dict[str, str]:
+    option_id = option.get("id")
+    if option_id is not None:
+        return {"id": str(option_id)}
+    return {"value": allowed_value_text(option)}
+
+
+def option_terms(value: str) -> list[str]:
+    terms: list[str] = []
+    for cjk_run in re.findall(r"[\u4e00-\u9fff]+", value):
+        parts = [part for part in re.split(r"[与和及或]", cjk_run) if part]
+        for part in parts:
+            if len(part) <= 2:
+                terms.append(part)
+            else:
+                terms.extend(part[index : index + 2] for index in range(len(part) - 1))
+    terms.extend(token for token in re.split(r"[^0-9a-zA-Z]+", value.casefold()) if len(token) >= 2)
+    return list(dict.fromkeys(term for term in terms if term))
+
+
+def keyword_hints_for_option(value: str, extra_hints: dict[str, list[str]] | None = None) -> list[str]:
+    hints = option_terms(value)
+    for term in list(hints):
+        hints.extend(TERM_SYNONYM_HINTS.get(term, []))
+    if extra_hints:
+        hints.extend(extra_hints.get(value, []))
+    return list(dict.fromkeys(hints))
+
+
+def score_allowed_option(
+    option: dict[str, Any],
+    intent_text: str,
+    preferred_value: str | None = None,
+    preferred_id: str | None = None,
+    extra_hints: dict[str, list[str]] | None = None,
+) -> tuple[int, list[str]]:
+    value = allowed_value_text(option)
+    option_id = str(option.get("id") or "")
+    normalized_intent = normalize_match_text(intent_text)
+    normalized_value = normalize_match_text(value)
+    score = 0
+    reasons: list[str] = []
+
+    if preferred_id and option_id == str(preferred_id):
+        score += 3
+        reasons.append("matches local preferred id")
+    if preferred_value and normalize_match_text(preferred_value) == normalized_value:
+        score += 3
+        reasons.append("matches local preferred value")
+    if normalized_value and normalized_value in normalized_intent:
+        score += 8
+        reasons.append("option text appears in intent")
+
+    ascii_tokens = [token for token in re.split(r"[^0-9a-zA-Z]+", value.casefold()) if len(token) >= 2]
+    for token in ascii_tokens:
+        if token in intent_text.casefold():
+            score += 2
+            reasons.append(f"intent contains token {token}")
+
+    for keyword in keyword_hints_for_option(value, extra_hints):
+        if normalize_match_text(keyword) and normalize_match_text(keyword) in normalized_intent:
+            score += 5
+            reasons.append(f"intent contains keyword {keyword}")
+
+    return score, reasons
+
+
+def select_allowed_option(
+    allowed_values: list[dict[str, Any]],
+    intent_text: str,
+    preferred_value: str | None = None,
+    preferred_id: str | None = None,
+    extra_hints: dict[str, list[str]] | None = None,
+) -> dict[str, Any] | None:
+    if not allowed_values:
+        return None
+    scored = []
+    for option in allowed_values:
+        score, reasons = score_allowed_option(option, intent_text, preferred_value, preferred_id, extra_hints)
+        scored.append((score, allowed_value_text(option), option, reasons))
+    scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    best_score, _, best_option, best_reasons = scored[0]
+    if best_score <= 0:
+        if len(allowed_values) == 1:
+            return {
+                "id": allowed_values[0].get("id"),
+                "value": allowed_value_text(allowed_values[0]),
+                "payload": option_payload(allowed_values[0]),
+                "score": 1,
+                "reasons": ["only allowed value"],
+            }
+        return None
+    return {
+        "id": best_option.get("id"),
+        "value": allowed_value_text(best_option),
+        "payload": option_payload(best_option),
+        "score": best_score,
+        "reasons": best_reasons,
+    }
+
+
+def field_preference(local_rule: dict[str, Any], field_id: str) -> tuple[str | None, str | None]:
+    required_fields = local_rule.get("required_fields") or {}
+    required_value = required_fields.get(field_id) or {}
+    preferred_value = required_value.get("value")
+    preferred_id = required_value.get("id")
+    if field_id == local_rule.get("category_field"):
+        preferred_value = preferred_value or local_rule.get("category")
+        preferred_id = preferred_id or local_rule.get("category_option_id")
+    return preferred_value, preferred_id
 
 
 @dataclass
@@ -135,8 +278,12 @@ class JiraTempoClient:
         summary: str,
         issue_type: str,
         category: str | None = None,
+        category_id: str | None = None,
         category_field: str = "customfield_13900",
         description: str | None = None,
+        assignee: str | None = None,
+        priority_id: str | None = None,
+        extra_fields: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         fields: dict[str, Any] = {
             "project": {"key": project_key},
@@ -145,8 +292,16 @@ class JiraTempoClient:
         }
         if description:
             fields["description"] = description
-        if category:
+        if assignee:
+            fields["assignee"] = {"name": assignee}
+        if priority_id:
+            fields["priority"] = {"id": str(priority_id)}
+        if category_id:
+            fields[category_field] = {"id": str(category_id)}
+        elif category:
             fields[category_field] = {"value": category}
+        if extra_fields:
+            fields.update(extra_fields)
         return self.request("POST", "/rest/api/2/issue", body={"fields": fields})
 
     def add_worklog(
@@ -265,11 +420,11 @@ def summarize_tempo_worklogs(
 
     rows = []
     for (day, issue_key), hours in sorted(totals.items()):
-        issue_compliance = "合规"
+        issue_compliance = COMPLIANT_LABEL
         if issue_key == "<unknown>":
-            issue_compliance = "未知：缺少issue"
+            issue_compliance = UNKNOWN_ISSUE_LABEL
         elif len(issue_weeks.get(issue_key, set())) > 1:
-            issue_compliance = "不合规：issue跨周"
+            issue_compliance = CROSS_WEEK_LABEL
         rows.append(
             {
                 "date": day,

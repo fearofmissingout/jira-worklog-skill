@@ -84,10 +84,16 @@ Recommended schema:
     "assignee": "self",
     "category_field": "customfield_xxxxx",
     "category": "某某子分类",
+    "category_option_id": "12345",
     "summary_template": "{iso_week} {task}",
     "description_template": "{task}",
     "required_fields": {
-      "customfield_xxxxx": {"value": "某某子分类"}
+      "customfield_xxxxx": {"id": "12345", "value": "某某子分类"}
+    },
+    "field_option_hints": {
+      "customfield_xxxxx": {
+        "某某子分类": ["开发", "测试", "验证"]
+      }
     }
   }
 }
@@ -98,6 +104,15 @@ The agent should discover this from:
 - Jira create/edit metadata;
 - recent compliant issues in the same project;
 - user confirmation or corrections.
+
+Field selection rules:
+
+- Always query current Jira metadata before creating an issue.
+- Required option fields must use an `allowedValues` entry from Jira; prefer option `id` payloads over display text.
+- Use the user's latest task text to score options. For example, descriptions containing QA, validation, API, coding, debugging, or integration work should favor a development/testing style category over an unrelated historical default.
+- Treat local rules and previous issues as weak preferences unless the user explicitly confirms the value in the current turn.
+- If a local rule points to a field or option no longer present in Jira metadata, stop and ask before creating.
+- After the user corrects a category/subcategory in natural language, update this local file so future runs learn the new rule.
 
 Creation gate:
 

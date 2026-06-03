@@ -40,6 +40,25 @@ GET /rest/api/2/issue/{issueKey}/editmeta
 
 Use metadata plus local project rules to confirm issue type, assignee/self support, category/subcategory fields, components, and required custom fields. If metadata conflicts with `.local/project-rules.local.json`, stop and ask the user to confirm the correct rule.
 
+For required option fields, prefer the resolver:
+
+```text
+python scripts/jira_worklog_cli.py resolve-issue-fields \
+  --project-key PROJECTKEY \
+  --issue-type "Task" \
+  --summary "Feature QA validation" \
+  --description "API validation and data export" \
+  --local-rules .local/project-rules.local.json
+```
+
+Resolution policy:
+
+1. User's current explicit field/category instruction wins.
+2. Jira create/edit metadata controls which fields and allowed values are valid.
+3. The current task text is scored against allowed option names and keyword hints.
+4. Local project rules and historical compliant issues are weak preferences, not hard-coded answers.
+5. If no option is clearly best, stop and ask; after confirmation, update `.local/project-rules.local.json`.
+
 ```text
 POST /rest/api/2/issue
 ```
@@ -57,6 +76,30 @@ Typical fields:
 ```
 
 Some Jira projects require additional custom fields such as category, request type, component, or customer field. Store project-specific defaults in private local config or environment variables, not public docs.
+
+When creating with resolved fields, pass Jira option ids when available:
+
+```json
+{
+  "fields": {
+    "project": {"key": "PROJECTKEY"},
+    "summary": "Feature QA validation",
+    "issuetype": {"name": "Task"},
+    "assignee": {"name": "current.user"},
+    "customfield_10000": {"id": "12345"}
+  }
+}
+```
+
+## Encoding
+
+The helper scripts send request bodies as UTF-8 JSON:
+
+```python
+json.dumps(body, ensure_ascii=False).encode("utf-8")
+```
+
+Use `Content-Type: application/json`. On Windows, set `PYTHONIOENCODING=utf-8` before printing Chinese JSON to the terminal. If Jira issue pages and Jira/Tempo REST API read-back show correct Chinese but a board/home page shows mojibake, the stored Jira data is probably correct; refresh/clear cache or inspect that page's response encoding before rewriting records.
 
 ## Jira Worklogs
 

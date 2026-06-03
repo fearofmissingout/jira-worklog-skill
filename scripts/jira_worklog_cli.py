@@ -9,13 +9,21 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from jira_tempo_client import JiraTempoClient, fetch_issue_details, summarize_tempo_worklogs
+from jira_tempo_client import (
+    JiraTempoClient,
+    field_preference,
+    fetch_issue_details,
+    select_allowed_option,
+    summarize_tempo_worklogs,
+)
 
 
 CONFIRM_PHRASE = "SUBMIT_JIRA_WORKLOGS"
 
 
 def emit(value: Any) -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     json.dump(value, sys.stdout, ensure_ascii=False, indent=2)
     sys.stdout.write("\n")
 
@@ -71,8 +79,151 @@ def cmd_check_tempo(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_resolve_issue_fields(args: argparse.Namespace) -> int:
+    client = JiraTempoClient.from_env()
+    try:
+        client.login_session()
+    except Exception:
+        pass
+    me = client.myself()
+    rules = load_project_rules(args.local_rules)
+    local_rule = rules.get(args.project_key, {})
+    issue_type = args.issue_type or local_rule.get("issue_type") or "Task"
+    intent_text = " ".join(value for value in [args.summary, args.description, args.intent] if value)
+    fields_meta = issue_type_fields(client, args.project_key, issue_type)
+    assignee = me.get("name") if local_rule.get("assignee") == "self" or args.assignee_self else None
+    resolved = resolve_create_fields(fields_meta, local_rule, intent_text, assignee)
+    create_fields = {
+        "project": {"key": args.project_key},
+        "summary": args.summary,
+        "issuetype": {"name": issue_type},
+        **resolved["extra_fields"],
+    }
+    if args.description:
+        create_fields["description"] = args.description
+    emit(
+        {
+            "project_key": args.project_key,
+            "issue_type": issue_type,
+            "create_fields": create_fields,
+            "resolved_fields": resolved["resolved_fields"],
+            "questions": resolved["questions"],
+            "blocking_errors": resolved["blocking_errors"],
+            "encoding": {
+                "request_body": "UTF-8 JSON",
+                "stdout": "UTF-8",
+                "note": "If a browser page shows mojibake while Jira/Tempo API readback is correct, treat it as a display/cache issue before rewriting data.",
+            },
+        }
+    )
+    return 0
+
+
 def load_plan(path: str) -> dict[str, Any]:
     return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def load_project_rules(path: str | None) -> dict[str, Any]:
+    if not path:
+        return {}
+    rule_path = Path(path)
+    if not rule_path.exists():
+        return {}
+    return json.loads(rule_path.read_text(encoding="utf-8"))
+
+
+def issue_type_fields(client: JiraTempoClient, project_key: str, issue_type: str) -> dict[str, Any]:
+    metadata = client.request(
+        "GET",
+        "/rest/api/2/issue/createmeta",
+        query={
+            "projectKeys": project_key,
+            "issuetypeNames": issue_type,
+            "expand": "projects.issuetypes.fields",
+        },
+    )
+    projects = metadata.get("projects") or []
+    if not projects:
+        raise RuntimeError(f"No create metadata found for project {project_key}.")
+    issue_types = projects[0].get("issuetypes") or []
+    selected = next((item for item in issue_types if item.get("name") == issue_type), None)
+    if not selected:
+        raise RuntimeError(f"Issue type {issue_type} is not available for project {project_key}.")
+    return selected.get("fields") or {}
+
+
+def resolve_create_fields(
+    fields_meta: dict[str, Any],
+    local_rule: dict[str, Any],
+    intent_text: str,
+    assignee: str | None,
+) -> dict[str, Any]:
+    core_fields = {"project", "summary", "issuetype"}
+    extra_fields: dict[str, Any] = {}
+    resolved_fields = []
+    questions = []
+    blocking_errors = []
+    option_hints = local_rule.get("field_option_hints") or {}
+
+    if assignee and "assignee" in fields_meta:
+        extra_fields["assignee"] = {"name": assignee}
+        resolved_fields.append({"field": "assignee", "value": "self", "reason": "authenticated user"})
+
+    if local_rule.get("priority_id") and "priority" in fields_meta:
+        extra_fields["priority"] = {"id": str(local_rule["priority_id"])}
+        resolved_fields.append({"field": "priority", "id": str(local_rule["priority_id"]), "reason": "local rule"})
+
+    candidate_field_ids = {
+        field_id
+        for field_id, field_meta in fields_meta.items()
+        if field_meta.get("required") and field_id not in core_fields
+    }
+    if local_rule.get("category_field"):
+        candidate_field_ids.add(str(local_rule["category_field"]))
+
+    for field_id in sorted(candidate_field_ids):
+        field_meta = fields_meta.get(field_id)
+        if not field_meta:
+            blocking_errors.append(f"{field_id} is configured locally but is not available in Jira create metadata.")
+            continue
+        allowed_values = field_meta.get("allowedValues") or []
+        preferred_value, preferred_id = field_preference(local_rule, field_id)
+        if allowed_values:
+            field_hints = option_hints.get(field_id) or {}
+            if not isinstance(field_hints, dict):
+                field_hints = {}
+            selected = select_allowed_option(
+                allowed_values,
+                intent_text=intent_text,
+                preferred_value=preferred_value,
+                preferred_id=preferred_id,
+                extra_hints={key: value for key, value in field_hints.items()},
+            )
+            if selected:
+                extra_fields[field_id] = selected["payload"]
+                resolved_fields.append(
+                    {
+                        "field": field_id,
+                        "field_name": field_meta.get("name"),
+                        "id": selected.get("id"),
+                        "value": selected.get("value"),
+                        "score": selected.get("score"),
+                        "reasons": selected.get("reasons"),
+                    }
+                )
+                continue
+            questions.append(
+                f"{field_meta.get('name') or field_id} needs one of {len(allowed_values)} options; no confident match from intent."
+            )
+            continue
+        questions.append(f"{field_meta.get('name') or field_id} is required but has no selectable allowed values.")
+
+    return {
+        "extra_fields": extra_fields,
+        "resolved_fields": resolved_fields,
+        "questions": questions,
+        "blocking_errors": blocking_errors,
+    }
 
 
 def validate_submittable(plan: dict[str, Any]) -> list[str]:
@@ -82,8 +233,12 @@ def validate_submittable(plan: dict[str, Any]) -> list[str]:
     if plan.get("questions"):
         errors.extend(plan["questions"])
     for issue in plan.get("issue_drafts", []):
-        if issue.get("needs_issue_creation") and not issue.get("category"):
-            errors.append(f"{issue.get('issue_summary')} needs category before issue creation.")
+        if issue.get("needs_issue_creation") and not (
+            issue.get("category")
+            or issue.get("category_id")
+            or issue.get("extra_fields")
+        ):
+            errors.append(f"{issue.get('issue_summary')} needs required issue fields before issue creation.")
         if not issue.get("needs_issue_creation") and not issue.get("issue_key"):
             errors.append(f"{issue.get('issue_summary')} has no issue key.")
     return errors
@@ -121,7 +276,12 @@ def cmd_submit_plan(args: argparse.Namespace) -> int:
                 summary=issue["issue_summary"],
                 issue_type=issue.get("issue_type", "Task"),
                 category=issue.get("category"),
+                category_id=issue.get("category_id"),
+                category_field=issue.get("category_field", "customfield_13900"),
                 description=issue.get("description"),
+                assignee=issue.get("assignee"),
+                priority_id=issue.get("priority_id"),
+                extra_fields=issue.get("extra_fields"),
             )
             issue_key = created["key"]
             created_issues.append({"key": issue_key, "summary": issue["issue_summary"]})
@@ -165,6 +325,16 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--to", dest="date_to", required=True)
     check.add_argument("--username", required=True)
     check.set_defaults(func=cmd_check_tempo)
+
+    resolve = sub.add_parser("resolve-issue-fields", help="Resolve Jira required issue fields from metadata and intent")
+    resolve.add_argument("--project-key", required=True)
+    resolve.add_argument("--issue-type")
+    resolve.add_argument("--summary", required=True)
+    resolve.add_argument("--description")
+    resolve.add_argument("--intent")
+    resolve.add_argument("--local-rules", help="Path to .local/project-rules.local.json")
+    resolve.add_argument("--assignee-self", action="store_true")
+    resolve.set_defaults(func=cmd_resolve_issue_fields)
 
     submit = sub.add_parser("submit-plan", help="Create missing issues and write worklogs from a plan JSON")
     submit.add_argument("--plan", required=True)

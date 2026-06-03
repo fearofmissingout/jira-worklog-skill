@@ -203,6 +203,21 @@ Get-Content -LiteralPath .\plan-input.json -Raw -Encoding utf8 |
 
 Review `plan-output.json`. Do not submit while `questions` or `blocking_errors` are non-empty.
 
+## Resolve Required Jira Fields
+
+Before creating a new issue, resolve required Jira fields from current metadata and task text:
+
+```powershell
+$env:PYTHONIOENCODING = "utf-8"
+python "$env:USERPROFILE\.codex\skills\jira-worklog\scripts\jira_worklog_cli.py" resolve-issue-fields `
+  --project-key EXAMPLE `
+  --issue-type "Task" `
+  --summary "某某功能 QA 验证" `
+  --local-rules "$env:USERPROFILE\.codex\skills\jira-worklog\.local\project-rules.local.json"
+```
+
+The helper sends Jira payloads as UTF-8 JSON. If REST/API read-back and the issue page show correct Chinese but a dashboard page shows mojibake, inspect that page's display encoding/cache before rewriting records.
+
 ## Check Existing Tempo Worklogs
 
 ```powershell

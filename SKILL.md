@@ -18,8 +18,9 @@ Create safe drafts first, ask when holidays or required fields are unclear, subm
    - hours per day or per task
    - holidays, leave days, makeup workdays, or unknown calendar dates
 2. Resolve project and issue candidates with Jira search before creating anything.
-3. Plan worklogs with `scripts/plan_worklogs.py`.
-4. Show the draft table to the user:
+3. Resolve Jira issue-create metadata with `scripts/jira_worklog_cli.py resolve-issue-fields` before creating an issue. Use the user's current task text, Jira allowed values, required fields, local project rules, and recent compliant history. Treat local defaults as weak preferences unless the user explicitly confirmed them for this run.
+4. Plan worklogs with `scripts/plan_worklogs.py`.
+5. Show the draft table to the user:
    - date
    - weekday
    - project key / project number
@@ -30,12 +31,12 @@ Create safe drafts first, ask when holidays or required fields are unclear, subm
    - issue compliance
    - comment
    - questions and blocking errors
-5. Do not submit while any question or blocking error remains.
-6. After the user explicitly approves, submit with `scripts/jira_worklog_cli.py submit-plan --confirm SUBMIT_JIRA_WORKLOGS`.
-7. Immediately run a read-back check and compare the submitted result against the draft.
-8. For scheduled reminders, daily auto-submit, weekly review, or monthly review, read [references/automation-workflow.md](references/automation-workflow.md) before creating or updating automations.
-9. For calendar setup, project issue-field rules, or local automation state, read [references/local-configuration.md](references/local-configuration.md). Generate local config from search/Jira/history plus user confirmation; do not ask users to hand-edit JSON.
-10. For "check skill updates", "update this skill", or similar requests, use `scripts/update_skill.py`.
+6. Do not submit while any question or blocking error remains.
+7. After the user explicitly approves, submit with `scripts/jira_worklog_cli.py submit-plan --confirm SUBMIT_JIRA_WORKLOGS`.
+8. Immediately run a read-back check and compare the submitted result against the draft.
+9. For scheduled reminders, daily auto-submit, weekly review, or monthly review, read [references/automation-workflow.md](references/automation-workflow.md) before creating or updating automations.
+10. For calendar setup, project issue-field rules, or local automation state, read [references/local-configuration.md](references/local-configuration.md). Generate local config from search/Jira/history plus user confirmation; do not ask users to hand-edit JSON.
+11. For "check skill updates", "update this skill", or similar requests, use `scripts/update_skill.py`.
 
 ## Worklog Rules
 
@@ -93,6 +94,12 @@ Last-resort backfill is allowed only when all are true:
 - no existing Tempo row for the target date would become duplicated or overfilled.
 
 Use generic examples in public docs and prompts, such as "某某项目", "某某功能开发", and "EXAMPLE". Do not include private company names, client names, domains, project names, project keys, categories, credentials, screenshots, cookies, HAR files, or local drafts.
+
+## Issue Field Resolution
+
+Before creating a ticket, run metadata resolution for the target project and issue type. Required option fields such as category/subcategory must be selected from Jira `allowedValues`; do not hard-code a value only because a prior issue used it. The resolver scores the user's latest task text against allowed option names and generic keyword hints, then uses local project rules only as a tie-breaker. If multiple options remain plausible, ask the user and save the confirmed answer under `.local/project-rules.local.json`.
+
+On Windows, keep all JSON files and Python stdout in UTF-8. Avoid sending non-ASCII text through ad hoc PowerShell here-strings or pipes unless `PYTHONIOENCODING=utf-8` is set. The client sends Jira request bodies as UTF-8 JSON with `Content-Type: application/json`; if Jira/Tempo API read-back is correct but a browser page shows mojibake, treat it as a UI/cache/display issue before rewriting data.
 
 ## Credentials
 
@@ -158,6 +165,7 @@ Useful commands:
 
 ```powershell
 python .\scripts\jira_worklog_cli.py me
+python .\scripts\jira_worklog_cli.py resolve-issue-fields --project-key EXAMPLE --issue-type Task --summary "Feature QA validation" --local-rules .\.local\project-rules.local.json
 python .\scripts\jira_worklog_cli.py check-tempo --from 2026-05-18 --to 2026-05-29 --username <jira-username>
 python .\scripts\jira_worklog_cli.py submit-plan --plan plan.json --confirm SUBMIT_JIRA_WORKLOGS
 ```
