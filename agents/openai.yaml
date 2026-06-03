@@ -1,4 +1,4 @@
 interface:
   display_name: "Jira Worklog"
-  short_description: "Draft, review, automate, update, and submit Jira/Tempo worklogs safely"
-  default_prompt: "Use Jira Worklog to turn natural-language work summaries into weekly-safe Jira issue and Tempo worklog drafts, support daily automation with local calendar/project rules, check skill updates, and verify after approved submission."
+  short_description: "Draft, review, automate, categorize, and submit Jira/Tempo worklogs safely"
+  default_prompt: "Use Jira Worklog to turn natural-language work summaries into weekly-safe Jira issue and Tempo worklog drafts, resolve Jira work categories and LLM baseline time, support daily automation with local calendar/project rules, check skill updates, and verify after approved submission."

@@ -18,6 +18,13 @@ from typing import Any
 DAILY_LIMIT_HOURS = 8.0
 
 
+def first_present(*values: Any) -> Any:
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+
 def load_default_categories() -> dict[str, str]:
     raw = os.environ.get("JIRA_DEFAULT_CATEGORIES_JSON")
     if not raw:
@@ -62,6 +69,20 @@ def clean_summary(text: str) -> str:
     return " ".join(str(text).strip().split())
 
 
+def baseline_hours_for_worklog(activity: dict[str, Any], payload: dict[str, Any], actual_hours: float) -> float | None:
+    baseline = first_present(
+        activity.get("without_llm_hours"),
+        activity.get("baseline_hours_without_llm"),
+        payload.get("without_llm_hours"),
+        payload.get("baseline_hours_without_llm"),
+    )
+    if baseline is not None:
+        return float(baseline)
+    if activity.get("llm_used") is True or payload.get("llm_used") is True:
+        return None
+    return actual_hours
+
+
 def match_existing_issue(
     week_start: dt.date,
     description: str,
@@ -86,17 +107,21 @@ def default_weekly_activities(payload: dict[str, Any]) -> list[dict[str, Any]]:
     extra_workdays = {parse_date(value) for value in payload.get("extra_workdays", [])}
     hours = float(payload.get("default_hours", DAILY_LIMIT_HOURS))
     description = payload.get("description") or "Worklog"
+    baseline = first_present(payload.get("without_llm_hours"), payload.get("baseline_hours_without_llm"))
 
     activities = []
     for day in daterange(start, end):
         if is_workday(day, non_workdays, extra_workdays):
-            activities.append(
-                {
-                    "date": day.isoformat(),
-                    "description": description,
-                    "hours": hours,
-                }
-            )
+            activity = {
+                "date": day.isoformat(),
+                "description": description,
+                "hours": hours,
+            }
+            if baseline is not None:
+                activity["without_llm_hours"] = float(baseline)
+            if "llm_used" in payload:
+                activity["llm_used"] = payload["llm_used"]
+            activities.append(activity)
     return activities
 
 
@@ -119,6 +144,7 @@ def group_issue_drafts(payload: dict[str, Any], activities: list[dict[str, Any]]
             {
                 "date": day.isoformat(),
                 "hours": float(activity["hours"]),
+                "without_llm_hours": baseline_hours_for_worklog(activity, payload, float(activity["hours"])),
                 "description": description,
                 "comment": activity.get("comment") or f"Working on: {description}",
             }
@@ -172,6 +198,15 @@ def validate_plan(issue_drafts: list[dict[str, Any]]) -> tuple[list[str], list[s
                     f"{issue['issue_summary']} has {day.isoformat()}, outside {issue['week_start']} to {issue['week_end']}."
                 )
             totals[day.isoformat()] += float(worklog["hours"])
+            baseline = worklog.get("without_llm_hours")
+            if baseline is None:
+                questions.append(
+                    f"{worklog['date']} needs without_llm_hours for Jira remaining estimate before submitting."
+                )
+            elif float(baseline) < float(worklog["hours"]):
+                questions.append(
+                    f"{worklog['date']} has without_llm_hours {baseline}h below actual {worklog['hours']}h; confirm before submitting."
+                )
 
     for day, hours in sorted(totals.items()):
         rounded = round(hours, 2)

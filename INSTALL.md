@@ -74,13 +74,14 @@ Codex should confirm:
 - whether last-resort weekly/monthly backfill is enabled;
 - whether the default 10:00 / 17:00 / 18:00 / 20:00 local-time schedule is acceptable;
 - whether the workflow should run only on confirmed workdays;
+- whether LLM/Agent baseline time should default to actual time when not mentioned;
 - whether any upcoming holidays, leave days, or makeup workdays are known.
 - whether local calendar and project issue-rule config should be initialized by the agent.
 
 Daily operation after setup:
 
-- 10:00: ask for today's project, task, and hours.
-- 17:00: show a draft using `日期 | 星期几 | 项目编号 | 项目 | issue | issue名字 | 工时 | issue是否合规`.
+- 10:00: ask for today's project, task, hours, and no-LLM/Agent baseline time if LLM/Agent was used.
+- 17:00: show a draft using `日期 | 星期几 | 项目编号 | 项目 | issue | issue名字 | 工时 | issue是否合规`, plus actual hours and `without_llm_hours` details before submission.
 - 18:00: submit only if auto-submit is enabled and the draft is clean; otherwise ask for confirmation.
 - 20:00: execute final fallback only when it was shown at 18:00, the user still has not responded, and all safety checks pass.
 - Last workday of the week: review missing, duplicate, overfilled, and cross-week issue records.
@@ -136,7 +137,7 @@ export JIRA_DEFAULT_CATEGORIES_JSON='{"PROJECTKEY":"Category Name"}'
 Run tests:
 
 ```powershell
-python "$env:USERPROFILE\.codex\skills\jira-worklog\tests\test_plan_worklogs.py"
+python -m unittest discover -s "$env:USERPROFILE\.codex\skills\jira-worklog\tests" -v
 ```
 
 Check CLI help:

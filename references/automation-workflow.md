@@ -18,6 +18,7 @@ Before creating or updating an automation, confirm:
 - whether last-resort weekly/monthly backfill is enabled;
 - whether 10:00, 17:00, 18:00, and 20:00 local time are acceptable;
 - whether the workflow should run only on confirmed workdays;
+- whether LLM/Agent baseline time should default to actual time when not mentioned;
 - whether any upcoming holidays, leave days, or makeup workdays are already known.
 - whether local calendar and project issue-rule config should be initialized or refreshed by the agent.
 
@@ -30,10 +31,12 @@ Prefer one controller automation in the active thread. Avoid creating separate r
 Ask one short question:
 
 ```text
-今天做哪些项目/任务？每项大概几小时？
+今天做哪些项目/任务？每项大概几小时？如果用了 LLM/Agent，大概相当于不用它要花几小时？
 ```
 
 Accept casual answers and normalize them into project/task/hour records.
+
+If the user does not mention LLM/Agent, set `without_llm_hours` equal to actual hours. If the user says LLM/Agent was used but does not provide baseline time, keep the draft blocked until clarified.
 
 Examples:
 
@@ -62,6 +65,7 @@ Generate a safe draft, then show the standard table:
 ```
 
 Also show comments, questions, and blocking errors when they exist.
+Also show actual hours and `without_llm_hours` for each draft worklog when asking for confirmation.
 
 Default issue strategy:
 
@@ -81,6 +85,7 @@ If auto-submit is enabled, submit only when all checks are clean:
 - date is a confirmed workday;
 - existing Tempo rows do not indicate duplicate or overfilled worklogs;
 - project, issue, issue summary, hours, and comment match the latest user description;
+- every worklog has `without_llm_hours`;
 - issue compliance is `合规`.
 
 After submission, immediately run a read-back check for the same date and compare the result against the draft.

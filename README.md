@@ -8,8 +8,9 @@ The skill is built around a safe workflow:
 2. Split work into weekly-safe Jira issues.
 3. Generate a draft before writing anything.
 4. Ask the user to resolve holidays, leave, makeup workdays, required fields, and duplicates.
-5. Submit only after explicit approval, or after a pre-configured 18:00 auto-submit gate passes every safety check.
-6. Read Jira/Tempo back after submission and verify the result.
+5. Include actual time plus the no-LLM/Agent baseline time for each worklog.
+6. Submit only after explicit approval, or after a pre-configured 18:00 auto-submit gate passes every safety check.
+7. Read Jira/Tempo back after submission and verify the result.
 
 No company domains, credentials, private project keys, screenshots, cookies, or HAR/WADL discovery artifacts should be committed to this repository.
 
@@ -22,6 +23,8 @@ No company domains, credentials, private project keys, screenshots, cookies, or 
 - Default full working day is 8 hours.
 - Holidays, leave days, weekends, and makeup workdays must be explicit when ambiguous.
 - Existing worklogs must be checked before submission.
+- Each worklog must include `without_llm_hours`, the estimated time without LLM/Agent assistance.
+- If LLM/Agent use is not mentioned, `without_llm_hours` defaults to actual hours.
 - Manual submission requires the exact confirmation phrase `SUBMIT_JIRA_WORKLOGS`.
 - Scheduled auto-submit is allowed only when the user opted in during automation setup and the current draft has no questions, blocking errors, duplicate risk, overfilled-day risk, or calendar ambiguity.
 - Completion requires read-back verification from Jira/Tempo.
@@ -39,6 +42,7 @@ No company domains, credentials, private project keys, screenshots, cookies, or 
 │   ├── automation-workflow.md
 │   ├── jira-tempo-api.md
 │   ├── local-configuration.md
+│   ├── work-category-policy.md
 │   └── worklog-rules.md
 ├── scripts/
 │   ├── jira_tempo_client.py
@@ -46,6 +50,7 @@ No company domains, credentials, private project keys, screenshots, cookies, or 
 │   ├── plan_worklogs.py
 │   └── update_skill.py
 └── tests/
+    ├── test_issue_field_resolution.py
     ├── test_plan_worklogs.py
     ├── test_tempo_summary.py
     └── test_update_skill.py
@@ -76,7 +81,7 @@ python "$env:USERPROFILE\.codex\skills\jira-worklog\scripts\jira_worklog_cli.py"
 Run tests:
 
 ```powershell
-python "$env:USERPROFILE\.codex\skills\jira-worklog\tests\test_plan_worklogs.py"
+python -m unittest discover -s "$env:USERPROFILE\.codex\skills\jira-worklog\tests" -v
 ```
 
 ## Check for Updates
@@ -187,6 +192,7 @@ Create a structured intent file:
     "name": "Example Project"
   },
   "default_hours": 8,
+  "without_llm_hours": 8,
   "description": "Feature development",
   "category": "Development"
 }
@@ -217,6 +223,23 @@ python "$env:USERPROFILE\.codex\skills\jira-worklog\scripts\jira_worklog_cli.py"
 ```
 
 The helper sends Jira payloads as UTF-8 JSON. If REST/API read-back and the issue page show correct Chinese but a dashboard page shows mojibake, inspect that page's display encoding/cache before rewriting records.
+
+## LLM Baseline Time
+
+The organization policy tracks two time values:
+
+- `hours`: actual completed/spent time.
+- `without_llm_hours`: estimated time without LLM/Agent assistance.
+
+When no LLM/Agent was used, or the user does not mention it, these two values are the same. When LLM/Agent was used, ask for the no-LLM baseline before submitting.
+
+The submit helper writes actual time to Jira worklog spent time and writes `without_llm_hours` through Jira remaining estimate:
+
+```text
+adjustEstimate=new&newEstimate=<without_llm_hours>
+```
+
+See `references/work-category-policy.md` for the current work categories and examples.
 
 ## Check Existing Tempo Worklogs
 

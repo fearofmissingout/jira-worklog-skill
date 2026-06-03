@@ -34,9 +34,10 @@ Create safe drafts first, ask when holidays or required fields are unclear, subm
 6. Do not submit while any question or blocking error remains.
 7. After the user explicitly approves, submit with `scripts/jira_worklog_cli.py submit-plan --confirm SUBMIT_JIRA_WORKLOGS`.
 8. Immediately run a read-back check and compare the submitted result against the draft.
-9. For scheduled reminders, daily auto-submit, weekly review, or monthly review, read [references/automation-workflow.md](references/automation-workflow.md) before creating or updating automations.
-10. For calendar setup, project issue-field rules, or local automation state, read [references/local-configuration.md](references/local-configuration.md). Generate local config from search/Jira/history plus user confirmation; do not ask users to hand-edit JSON.
-11. For "check skill updates", "update this skill", or similar requests, use `scripts/update_skill.py`.
+9. For organization work categories or LLM/Agent baseline time requirements, read [references/work-category-policy.md](references/work-category-policy.md).
+10. For scheduled reminders, daily auto-submit, weekly review, or monthly review, read [references/automation-workflow.md](references/automation-workflow.md) before creating or updating automations.
+11. For calendar setup, project issue-field rules, or local automation state, read [references/local-configuration.md](references/local-configuration.md). Generate local config from search/Jira/history plus user confirmation; do not ask users to hand-edit JSON.
+12. For "check skill updates", "update this skill", or similar requests, use `scripts/update_skill.py`.
 
 ## Worklog Rules
 
@@ -47,6 +48,7 @@ Read [references/worklog-rules.md](references/worklog-rules.md) before planning 
 - If the user specifies different daily tasks or multiple tasks in a day, split by those tasks.
 - The lowest acceptable fallback is one issue, but only within one week.
 - Default full working day is 8h.
+- Each planned worklog must include `without_llm_hours`. If the user does not mention LLM/Agent use, default `without_llm_hours` to the actual worklog hours. If the user says LLM/Agent was used and does not give the no-LLM baseline, ask before submitting.
 - Do not write worklogs for holidays, weekends, leave days, or uncertain dates without user confirmation.
 - If the calendar is ambiguous, ask which dates are non-working days and which weekend dates are makeup workdays.
 - Check existing worklogs before submitting to avoid duplicates and overfilled days.
@@ -97,7 +99,13 @@ Use generic examples in public docs and prompts, such as "某某项目", "某某
 
 ## Issue Field Resolution
 
-Before creating a ticket, run metadata resolution for the target project and issue type. Required option fields such as category/subcategory must be selected from Jira `allowedValues`; do not hard-code a value only because a prior issue used it. The resolver scores the user's latest task text against allowed option names and generic keyword hints, then uses local project rules only as a tie-breaker. If multiple options remain plausible, ask the user and save the confirmed answer under `.local/project-rules.local.json`.
+Before creating a ticket, run metadata resolution for the target project and issue type. Required option fields such as category/subcategory must be selected from Jira `allowedValues`; do not hard-code a value only because a prior issue used it. The resolver scores the user's latest task text against allowed option names, [work category policy](references/work-category-policy.md), and generic keyword hints, then uses local project rules only as a tie-breaker. If multiple options remain plausible, ask the user and save the confirmed answer under `.local/project-rules.local.json`.
+
+For current organization work categories, prefer work-type categories such as `方案与文档`, `会议与沟通`, `咨询与分析`, `开发测试与验证`, `项目实施与迁移`, `日常工单与配置`, `变更与问题处理`, and `进度协调与管理` over legacy solution-line categories when Jira metadata exposes both.
+
+## LLM Baseline Time
+
+When submitting worklogs, use actual time as completed/spent time and `without_llm_hours` as the Jira remaining estimate. If no LLM/Agent was used or the user does not mention it, set both times equal. If LLM/Agent was used, ask for the hypothetical no-LLM time unless the user already provided it. The REST helper submits this via `adjustEstimate=new&newEstimate=<without_llm_hours>`.
 
 On Windows, keep all JSON files and Python stdout in UTF-8. Avoid sending non-ASCII text through ad hoc PowerShell here-strings or pipes unless `PYTHONIOENCODING=utf-8` is set. The client sends Jira request bodies as UTF-8 JSON with `Content-Type: application/json`; if Jira/Tempo API read-back is correct but a browser page shows mojibake, treat it as a UI/cache/display issue before rewriting data.
 
@@ -148,6 +156,7 @@ Pass structured JSON through stdin. On Windows PowerShell, prefer a UTF-8 JSON f
     "name": "Example Project"
   },
   "default_hours": 8,
+  "without_llm_hours": 8,
   "description": "Feature development",
   "category": "Development"
 }
@@ -187,5 +196,5 @@ For a pre-authorized 18:00 auto-submit workflow, pass the confirmation phrase on
 - Do not create one issue covering multiple weeks.
 - Do not fill every weekday blindly when the date range may include holidays, leave, or makeup days.
 - Do not submit if required create-issue fields are missing.
-- Do not assume UI defaults such as remaining estimate should be changed; worklog submission should use `adjustEstimate=leave` unless the user explicitly says otherwise.
+- Do not use `adjustEstimate=leave` for organization-compliant submissions when `without_llm_hours` is required; submit `newEstimate` from the planned baseline time and verify the target Jira/Tempo behavior.
 - Do not claim completion before a fresh read-back check.

@@ -165,6 +165,57 @@ class PlanWorklogsTest(unittest.TestCase):
         self.assertEqual(draft["extra_fields"], {"customfield_10000": {"id": "2"}})
         self.assertEqual(result["questions"], [])
 
+    def test_defaults_without_llm_hours_to_actual_hours_when_llm_not_declared(self):
+        result = run_plan(
+            {
+                "date_from": "2026-06-01",
+                "date_to": "2026-06-01",
+                "project": {"key": "EXAMPLE", "name": "Example Project"},
+                "category": "Development",
+                "default_hours": 8,
+                "description": "Feature development",
+            }
+        )
+
+        self.assertEqual(result["issue_drafts"][0]["worklogs"][0]["without_llm_hours"], 8.0)
+        self.assertEqual(result["questions"], [])
+
+    def test_asks_for_without_llm_hours_when_llm_used_and_baseline_missing(self):
+        result = run_plan(
+            {
+                "date_from": "2026-06-01",
+                "date_to": "2026-06-01",
+                "project": {"key": "EXAMPLE", "name": "Example Project"},
+                "category": "Development",
+                "default_hours": 4,
+                "description": "Agent-assisted validation",
+                "llm_used": True,
+            }
+        )
+
+        self.assertIsNone(result["issue_drafts"][0]["worklogs"][0]["without_llm_hours"])
+        self.assertEqual(
+            result["questions"],
+            ["2026-06-01 needs without_llm_hours for Jira remaining estimate before submitting."],
+        )
+
+    def test_uses_explicit_without_llm_hours_for_agent_assisted_work(self):
+        result = run_plan(
+            {
+                "date_from": "2026-06-01",
+                "date_to": "2026-06-01",
+                "project": {"key": "EXAMPLE", "name": "Example Project"},
+                "category": "Development",
+                "default_hours": 4,
+                "without_llm_hours": 8,
+                "description": "Agent-assisted validation",
+                "llm_used": True,
+            }
+        )
+
+        self.assertEqual(result["issue_drafts"][0]["worklogs"][0]["without_llm_hours"], 8.0)
+        self.assertEqual(result["questions"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

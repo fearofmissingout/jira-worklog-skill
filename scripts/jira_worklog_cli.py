@@ -241,6 +241,9 @@ def validate_submittable(plan: dict[str, Any]) -> list[str]:
             errors.append(f"{issue.get('issue_summary')} needs required issue fields before issue creation.")
         if not issue.get("needs_issue_creation") and not issue.get("issue_key"):
             errors.append(f"{issue.get('issue_summary')} has no issue key.")
+        for worklog in issue.get("worklogs", []):
+            if worklog.get("llm_used") is True and worklog.get("without_llm_hours") is None:
+                errors.append(f"{worklog.get('date')} used LLM/Agent but has no without_llm_hours baseline.")
     return errors
 
 
@@ -287,11 +290,17 @@ def cmd_submit_plan(args: argparse.Namespace) -> int:
             created_issues.append({"key": issue_key, "summary": issue["issue_summary"]})
 
         for worklog in issue.get("worklogs", []):
+            without_llm_hours = worklog.get("without_llm_hours")
+            if without_llm_hours is None:
+                without_llm_hours = worklog.get("baseline_hours_without_llm")
+            if without_llm_hours is None:
+                without_llm_hours = worklog["hours"]
             created = client.add_worklog(
                 issue_key=issue_key,
                 date=worklog["date"],
                 hours=float(worklog["hours"]),
                 comment=worklog.get("comment") or worklog.get("description") or issue["issue_summary"],
+                remaining_estimate_hours=float(without_llm_hours),
             )
             created_worklogs.append(
                 {
@@ -299,6 +308,7 @@ def cmd_submit_plan(args: argparse.Namespace) -> int:
                     "worklog_id": created.get("id"),
                     "date": worklog["date"],
                     "hours": float(worklog["hours"]),
+                    "without_llm_hours": float(without_llm_hours),
                 }
             )
 

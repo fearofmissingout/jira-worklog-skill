@@ -5,10 +5,37 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from jira_tempo_client import fetch_issue_details, summarize_tempo_worklogs
+from jira_tempo_client import JiraTempoClient, fetch_issue_details, jira_estimate_from_hours, summarize_tempo_worklogs
 
 
 class TempoSummaryTest(unittest.TestCase):
+    def test_jira_estimate_from_hours_formats_minutes(self):
+        self.assertEqual(jira_estimate_from_hours(8), "8h")
+        self.assertEqual(jira_estimate_from_hours(1.5), "1h 30m")
+        self.assertEqual(jira_estimate_from_hours(0.25), "15m")
+
+    def test_add_worklog_writes_remaining_estimate_when_baseline_is_supplied(self):
+        class FakeClient(JiraTempoClient):
+            def __init__(self):
+                super().__init__(base_url="https://jira.example.test")
+                self.calls = []
+
+            def request(self, method, path, body=None, query=None, use_basic=True):
+                self.calls.append({"method": method, "path": path, "body": body, "query": query})
+                return {"id": "123"}
+
+        fake = FakeClient()
+        fake.add_worklog(
+            "EXAMPLE-101",
+            "2026-06-01",
+            4,
+            "Working on: API validation",
+            remaining_estimate_hours=6.5,
+        )
+
+        self.assertEqual(fake.calls[0]["query"], {"adjustEstimate": "new", "newEstimate": "6h 30m"})
+        self.assertEqual(fake.calls[0]["body"]["timeSpentSeconds"], 14400)
+
     def test_summary_includes_project_fields_from_tempo_issue_payload(self):
         rows = summarize_tempo_worklogs(
             [

@@ -44,6 +44,120 @@ TERM_SYNONYM_HINTS = {
     "管理": ["management", "协调", "计划", "排期"],
 }
 
+WORK_CATEGORY_HINTS = {
+    "方案与文档": [
+        "售前方案",
+        "技术方案",
+        "交付文档",
+        "设计文档",
+        "项目周报",
+        "汇报材料",
+        "验收材料",
+        "测试报告",
+        "报告",
+        "材料",
+        "文档",
+    ],
+    "会议与沟通": [
+        "客户会议",
+        "内部会议",
+        "需求沟通",
+        "技术评审",
+        "变更沟通",
+        "项目例会",
+        "问题同步",
+        "会议",
+        "沟通",
+        "评审",
+        "同步",
+    ],
+    "咨询与分析": [
+        "顾问咨询",
+        "需求分析",
+        "风险分析",
+        "安全评估",
+        "现状调研",
+        "技术选型",
+        "方案比选",
+        "咨询",
+        "分析",
+        "评估",
+        "调研",
+    ],
+    "开发测试与验证": [
+        "前端开发",
+        "后端开发",
+        "接口开发",
+        "脚本开发",
+        "测试用例",
+        "功能测试",
+        "联调测试",
+        "缺陷验证",
+        "开发",
+        "测试",
+        "验证",
+        "接口",
+        "脚本",
+        "联调",
+        "qa",
+    ],
+    "项目实施与迁移": [
+        "系统部署",
+        "环境搭建",
+        "数据迁移",
+        "版本上线",
+        "客户现场实施",
+        "交付验收支持",
+        "项目初始化配置",
+        "实施",
+        "部署",
+        "迁移",
+        "上线",
+        "环境",
+    ],
+    "日常工单与配置": [
+        "资源开通",
+        "账号权限配置",
+        "参数调整",
+        "配置变更",
+        "数据修正",
+        "证书更新",
+        "策略调整",
+        "标准服务请求",
+        "工单",
+        "权限",
+        "配置",
+        "证书",
+    ],
+    "变更与问题处理": [
+        "变更方案",
+        "变更执行",
+        "故障排查",
+        "故障修复",
+        "缺陷修复",
+        "性能优化",
+        "配置优化",
+        "变更",
+        "故障",
+        "缺陷",
+        "修复",
+        "优化",
+    ],
+    "进度协调与管理": [
+        "计划排期",
+        "进度跟踪",
+        "资源协调",
+        "风险跟踪",
+        "待办推进",
+        "里程碑管理",
+        "跨团队协调",
+        "进度",
+        "协调",
+        "风险",
+        "里程碑",
+    ],
+}
+
 
 class JiraApiError(RuntimeError):
     def __init__(self, method: str, url: str, status: int | None, body: str):
@@ -83,7 +197,8 @@ def option_terms(value: str) -> list[str]:
 
 
 def keyword_hints_for_option(value: str, extra_hints: dict[str, list[str]] | None = None) -> list[str]:
-    hints = option_terms(value)
+    hints = list(WORK_CATEGORY_HINTS.get(value, []))
+    hints.extend(option_terms(value))
     for term in list(hints):
         hints.extend(TERM_SYNONYM_HINTS.get(term, []))
     if extra_hints:
@@ -172,6 +287,19 @@ def field_preference(local_rule: dict[str, Any], field_id: str) -> tuple[str | N
         preferred_value = preferred_value or local_rule.get("category")
         preferred_id = preferred_id or local_rule.get("category_option_id")
     return preferred_value, preferred_id
+
+
+def jira_estimate_from_hours(hours: float) -> str:
+    total_minutes = int(round(float(hours) * 60))
+    if total_minutes <= 0:
+        return "0m"
+    whole_hours, minutes = divmod(total_minutes, 60)
+    parts = []
+    if whole_hours:
+        parts.append(f"{whole_hours}h")
+    if minutes:
+        parts.append(f"{minutes}m")
+    return " ".join(parts)
 
 
 @dataclass
@@ -312,13 +440,20 @@ class JiraTempoClient:
         comment: str,
         timezone: str = "+0800",
         adjust_estimate: str = "leave",
+        remaining_estimate: str | None = None,
+        remaining_estimate_hours: float | None = None,
     ) -> dict[str, Any]:
         seconds = int(round(hours * 3600))
         started = f"{date}T00:00:00.000{timezone}"
+        query = {"adjustEstimate": adjust_estimate}
+        if remaining_estimate is not None:
+            query = {"adjustEstimate": "new", "newEstimate": remaining_estimate}
+        elif remaining_estimate_hours is not None:
+            query = {"adjustEstimate": "new", "newEstimate": jira_estimate_from_hours(remaining_estimate_hours)}
         return self.request(
             "POST",
             f"/rest/api/2/issue/{urllib.parse.quote(issue_key)}/worklog",
-            query={"adjustEstimate": adjust_estimate},
+            query=query,
             body={
                 "comment": comment,
                 "started": started,

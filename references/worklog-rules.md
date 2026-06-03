@@ -20,6 +20,10 @@ The skill is designed for Jira/Tempo workflows where timesheet entries should be
 - Worklogs inside an issue must be between that issue's `week_start` and `week_end`.
 - A date's total planned worklog hours must not exceed 8h unless the user explicitly approves overtime.
 - Default full working day: 8h.
+- Every planned worklog must carry `without_llm_hours`, meaning the estimated time the same work would have taken without LLM/Agent assistance.
+- If the user does not mention LLM/Agent use, set `without_llm_hours` equal to actual `hours`.
+- If the user says LLM/Agent was used but does not provide `without_llm_hours`, ask before submitting.
+- If `without_llm_hours` is lower than actual `hours`, ask before submitting.
 - Do not create or submit anything if duplicate worklogs appear likely.
 
 ## Calendar Handling
@@ -59,6 +63,7 @@ Before submission, show a draft and require explicit approval. The draft must in
 - issue summary;
 - hours;
 - issue compliance;
+- actual hours and `without_llm_hours`;
 - comment;
 - questions;
 - blocking errors.

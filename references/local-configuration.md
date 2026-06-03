@@ -87,6 +87,8 @@ Recommended schema:
     "category_option_id": "12345",
     "summary_template": "{iso_week} {task}",
     "description_template": "{task}",
+    "worklog_baseline_mode": "jira_remaining_estimate",
+    "rest_remaining_estimate_verified": false,
     "required_fields": {
       "customfield_xxxxx": {"id": "12345", "value": "某某子分类"}
     },
@@ -113,6 +115,12 @@ Field selection rules:
 - Treat local rules and previous issues as weak preferences unless the user explicitly confirms the value in the current turn.
 - If a local rule points to a field or option no longer present in Jira metadata, stop and ask before creating.
 - After the user corrects a category/subcategory in natural language, update this local file so future runs learn the new rule.
+
+Worklog baseline rules:
+
+- `worklog_baseline_mode: "jira_remaining_estimate"` means submit actual hours as completed/spent time and `without_llm_hours` as Jira `newEstimate`.
+- `rest_remaining_estimate_verified: true` means the local Jira/Tempo reports have been checked and REST `newEstimate` satisfies the required no-LLM/Agent baseline field.
+- If REST behavior is not verified and the user needs guaranteed compliance, use browser/UI automation to fill the worklog modal's remaining estimate field, then update this local flag after read-back.
 
 Creation gate:
 

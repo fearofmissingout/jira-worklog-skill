@@ -106,7 +106,7 @@ Use `Content-Type: application/json`. On Windows, set `PYTHONIOENCODING=utf-8` b
 Create:
 
 ```text
-POST /rest/api/2/issue/{issueKey}/worklog?adjustEstimate=leave
+POST /rest/api/2/issue/{issueKey}/worklog?adjustEstimate=new&newEstimate=<baseline>
 ```
 
 Payload:
@@ -125,7 +125,14 @@ Read:
 GET /rest/api/2/issue/{issueKey}/worklog
 ```
 
-Prefer `adjustEstimate=leave` unless the user explicitly asks to change remaining estimate.
+For organization worklog policy, actual time goes in `timeSpentSeconds`; the no-LLM/Agent baseline goes in Jira remaining estimate via `newEstimate`.
+
+Examples:
+
+- No LLM/Agent used: actual 8h and baseline 8h -> `timeSpentSeconds=28800`, `newEstimate=8h`.
+- LLM/Agent used: actual 4h and baseline 8h -> `timeSpentSeconds=14400`, `newEstimate=8h`.
+
+If the target Jira instance treats remaining estimate only as issue-level state and not as per-worklog report data, verify once with the UI/report. If REST cannot satisfy the required report field, use browser/UI automation for the worklog modal and record that behavior in private local config.
 
 ## Tempo Worklogs
 
